@@ -1,1 +1,47 @@
+name: Visa Slot Monitor
 
+on:
+  schedule:
+    # Runs every 6 minutes (GitHub's minimum reliable interval is ~5-6 min)
+    - cron: '*/6 * * * *'
+  workflow_dispatch:
+    # Adds a manual "Run workflow" button in the GitHub Actions tab
+    # Use this to test immediately after setup
+
+jobs:
+  monitor:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install Python packages
+        run: pip install requests beautifulsoup4 playwright
+
+      - name: Cache Playwright Chromium binary
+        id: playwright-cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          # Change the key suffix if you want to force a fresh download
+          key: playwright-chromium-v1
+
+      - name: Install Playwright browsers (only if not cached)
+        if: steps.playwright-cache.outputs.cache-hit != 'true'
+        run: playwright install chromium --with-deps
+
+      - name: Install Chromium system deps (always needed)
+        run: playwright install-deps chromium
+
+      - name: Run visa monitor
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: python monitor.py
